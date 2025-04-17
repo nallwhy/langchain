@@ -10,9 +10,9 @@ defmodule LangChain.Function do
     should describe what the function is used for or what it returns. This
     information is used by the LLM to decide which function to call and for what
     purpose.
-  * ` parameters` - A list of `Function.FunctionParam` structs that are
+  * `parameters` - A list of `Function.FunctionParam` structs that are
     converted to a JSONSchema format. (Use in place of `parameters_schema`)
-  * ` parameters_schema` - A [JSONSchema
+  * `parameters_schema` - A [JSONSchema
     structure](https://json-schema.org/learn/getting-started-step-by-step.html)
     that describes the required data structure format for how arguments are
     passed to the function. (Use if greater control or unsupported features are

@@ -449,10 +449,7 @@ defmodule LangChain.Message do
   @doc """
   Return if a Message is a tool_call.
   """
-  def is_tool_call?(%Message{role: :assistant, status: :complete, tool_calls: tool_calls})
-      when is_list(tool_calls) and tool_calls != [],
-      do: true
-
+  def is_tool_call?(%Message{role: :assistant, status: :complete, tool_calls: [_ | _]}), do: true
   def is_tool_call?(%Message{}), do: false
 
   @doc """

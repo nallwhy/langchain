@@ -783,8 +783,9 @@ defmodule LangChain.Chains.LLMChain do
   def add_message(%LLMChain{} = chain, %Message{} = new_message) do
     needs_response =
       cond do
-        new_message.role in [:user, :tool] -> true
+        new_message.role in [:user] -> true
         Message.is_tool_call?(new_message) -> true
+        new_message.role in [:tool] -> false
         new_message.role in [:system, :assistant] -> false
       end
 
