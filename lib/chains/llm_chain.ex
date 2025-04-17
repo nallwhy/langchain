@@ -369,7 +369,7 @@ defmodule LangChain.Chains.LLMChain do
       if chain.verbose, do: IO.inspect(chain.messages, label: "MESSAGES")
 
       tools = chain.tools
-      if chain.verbose, do: IO.inspect(tools, label: "TOOLS")
+      # if chain.verbose, do: IO.inspect(tools, label: "TOOLS")
 
       # clear the set of exchanged messages.
       chain = clear_exchanged_messages(chain)
