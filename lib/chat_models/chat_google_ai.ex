@@ -101,6 +101,18 @@ defmodule LangChain.ChatModels.ChatGoogleAI do
     # selected using temperature sampling.
     field :top_k, :float, default: 1.0
 
+    # thinking models only
+    #
+    # The number of thinking tokens it can use when generating a response.
+    # Model-specific behavior:
+    # - 2.5 Pro: Dynamic thinking by default (128-32768 range), cannot disable thinking
+    # - 2.5 Flash: Dynamic thinking by default (0-24576 range), set to 0 to disable
+    # - 2.5 Flash Lite: No thinking by default (512-24576 range), set to 0 to disable
+    # Set to -1 to enable dynamic thinking (model decides when and how much to think)
+    # Set to 0 to disable thinking (except for 2.5 Pro which uses minimum value)
+    # Set to specific value within model's range for fixed thinking budget
+    field :thinking_budget, :integer
+
     # Duration in seconds for the response to be received. When streaming a very
     # lengthy response, a longer time limit may be required. However, when it
     # goes on too long by itself, it tends to hallucinate more.
@@ -133,6 +145,7 @@ defmodule LangChain.ChatModels.ChatGoogleAI do
     :temperature,
     :top_p,
     :top_k,
+    :thinking_budget,
     :receive_timeout,
     :json_response,
     :json_schema,
@@ -219,6 +232,26 @@ defmodule LangChain.ChatModels.ChatGoogleAI do
           {nil, nil}
       end
 
+    thinking_config =
+      case google_ai.thinking_budget do
+        # Disable thinking
+        nil ->
+          default_thinking_budget =
+            case google_ai.model do
+              "gemini-2.5-pro" ->
+                # Can't disable thinking, so use minimum value
+                128
+
+              _ ->
+                0
+            end
+
+          %{"includeThoughts" => true, "thinkingBudget" => default_thinking_budget}
+
+        thinking_budget when is_integer(thinking_budget) ->
+          %{"includeThoughts" => true, "thinkingBudget" => thinking_budget}
+      end
+
     generation_config_params =
       %{
         "temperature" => google_ai.temperature,
@@ -227,6 +260,7 @@ defmodule LangChain.ChatModels.ChatGoogleAI do
       }
       |> Utils.conditionally_add_to_map("response_mime_type", response_mime_type)
       |> Utils.conditionally_add_to_map("response_schema", response_schema)
+      |> Utils.conditionally_add_to_map("thinkingConfig", thinking_config)
 
     req =
       %{
@@ -644,7 +678,13 @@ defmodule LangChain.ChatModels.ChatGoogleAI do
       |> filter_parts_for_types(["text"])
       |> filter_text_parts()
       |> Enum.map(fn part ->
-        ContentPart.new!(%{type: :text, content: part["text"]})
+        type =
+          case part["thought"] do
+            true -> :thinking
+            _ -> :text
+          end
+
+        ContentPart.new!(%{type: type, content: part["text"]})
       end)
 
     tool_calls_from_parts =
@@ -685,10 +725,13 @@ defmodule LangChain.ChatModels.ChatGoogleAI do
         %{"content" => %{"parts" => parts} = content_data} = data,
         MessageDelta
       ) do
-    text_content =
+    content =
       case parts do
+        [%{"text" => text, "thought" => true}] ->
+          ContentPart.new!(%{type: :thinking, content: text})
+
         [%{"text" => text}] ->
-          text
+          ContentPart.new!(%{type: :text, content: text})
 
         _other ->
           nil
@@ -703,7 +746,7 @@ defmodule LangChain.ChatModels.ChatGoogleAI do
 
     %{
       role: unmap_role(content_data["role"]),
-      content: text_content,
+      content: content,
       complete: finish_reason_to_status(data["finishReason"]),
       index: data["index"]
     }
@@ -824,6 +867,7 @@ defmodule LangChain.ChatModels.ChatGoogleAI do
         :top_p,
         :top_k,
         :receive_timeout,
+        :thinking_budget,
         :json_response,
         :json_schema,
         :stream,
